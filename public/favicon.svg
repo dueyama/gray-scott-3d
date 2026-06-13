@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Gray-Scott 3D reaction-diffusion pattern">
+  <defs>
+    <radialGradient id="bg" cx="44" cy="18" r="58" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#17251f" />
+      <stop offset="0.55" stop-color="#070909" />
+      <stop offset="1" stop-color="#130b08" />
+    </radialGradient>
+    <linearGradient id="tube" x1="11" y1="18" x2="54" y2="52" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#d8efe6" />
+      <stop offset="0.34" stop-color="#2ed3c4" />
+      <stop offset="0.7" stop-color="#a8c65d" />
+      <stop offset="1" stop-color="#f07858" />
+    </linearGradient>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="1.8" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+  </defs>
+  <rect x="2" y="2" width="60" height="60" rx="14" fill="url(#bg)" />
+  <path d="M12 38c8-16 18 5 27-9 6-9 9-14 16-8" fill="none" stroke="#d8efe6" stroke-opacity="0.32" stroke-width="12" stroke-linecap="round" />
+  <path d="M12 38c8-16 18 5 27-9 6-9 9-14 16-8" fill="none" stroke="url(#tube)" stroke-width="7.2" stroke-linecap="round" filter="url(#glow)" />
+  <path d="M17 18c9 5 4 13 13 17 8 4 14 1 19 10" fill="none" stroke="#e6f2d8" stroke-opacity="0.24" stroke-width="10" stroke-linecap="round" />
+  <path d="M17 18c9 5 4 13 13 17 8 4 14 1 19 10" fill="none" stroke="url(#tube)" stroke-opacity="0.82" stroke-width="5.8" stroke-linecap="round" filter="url(#glow)" />
+  <circle cx="19" cy="47" r="5.2" fill="#d8efe6" opacity="0.45" />
+  <circle cx="19" cy="47" r="3.4" fill="#2ed3c4" opacity="0.92" />
+  <circle cx="47" cy="14" r="5.8" fill="#d8efe6" opacity="0.36" />
+  <circle cx="47" cy="14" r="3.6" fill="#f07858" opacity="0.9" />
+  <circle cx="35" cy="49" r="3.9" fill="#a8c65d" opacity="0.82" />
+  <circle cx="25" cy="25" r="2.6" fill="#06100e" opacity="0.72" />
+  <circle cx="43" cy="32" r="2.9" fill="#06100e" opacity="0.62" />
+  <circle cx="34" cy="39" r="2.2" fill="#06100e" opacity="0.58" />
+  <rect x="2.75" y="2.75" width="58.5" height="58.5" rx="13.25" fill="none" stroke="#35d1c5" stroke-opacity="0.3" stroke-width="1.5" />
+</svg>

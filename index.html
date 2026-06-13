@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      data-i18n-content="meta.main.description"
+      name="description"
+      content="Gray-Scott モデルの3次元反応拡散パターンをブラウザで観察できる啓蒙用Webアプリ。"
+    />
+    <meta name="theme-color" content="#070909" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180" />
+    <link rel="mask-icon" href="/safari-pinned-tab.svg" color="#2ed3c4" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <title data-i18n="title.main">Gray-Scott 3D</title>
+  </head>
+  <body>
+    <div id="app">
+      <header class="topbar">
+        <a class="brand" href="/" aria-label="Gray-Scott 3D">
+          <img class="brand-icon" src="/icon-192.png" width="38" height="38" alt="" aria-hidden="true" />
+          <span>
+            <strong>Gray-Scott 3D</strong>
+            <small data-i18n="brand.subtitle">3次元反応拡散モデルのシミュレーション</small>
+          </span>
+        </a>
+        <div class="top-actions">
+          <div class="lang-switch" data-i18n-aria-label="aria.lang" aria-label="言語">
+            <button type="button" data-lang-mode="auto" aria-pressed="true" data-i18n="lang.auto">AUTO</button>
+            <button type="button" data-lang-mode="en" aria-pressed="false" data-i18n="lang.en">EN</button>
+            <button type="button" data-lang-mode="jp" aria-pressed="false" data-i18n="lang.jp">JP</button>
+          </div>
+          <nav class="top-links" data-i18n-aria-label="aria.pageNav" aria-label="ページ移動">
+            <a href="/about.html" data-i18n="nav.about">解説</a>
+            <a href="https://github.com/dueyama/gray-scott-3d" target="_blank" rel="noreferrer" data-i18n="nav.github">GitHub</a>
+          </nav>
+        </div>
+      </header>
+
+      <main class="layout">
+        <aside class="panel controls" data-i18n-aria-label="aria.params" aria-label="パラメータ">
+          <section>
+            <h2 data-i18n="section.presets">プリセット</h2>
+            <div class="preset-grid" id="presetGrid"></div>
+          </section>
+
+          <section class="mode-section">
+            <h2 data-i18n="section.display">表示</h2>
+            <div class="view-mode" data-i18n-aria-label="aria.viewMode" aria-label="表示モード">
+              <button id="volumeMode" type="button" aria-pressed="true" data-i18n="view.volume">Volume</button>
+              <button id="surfaceMode" type="button" aria-pressed="false" data-i18n="view.surface">等値面</button>
+            </div>
+          </section>
+
+          <section class="control-list">
+            <h2 data-i18n="section.parameters">パラメータ</h2>
+            <div class="slider-row fine-slider-row">
+              <span data-i18n="control.feed">F（供給率）</span>
+              <input id="feed" type="range" min="0.01" max="0.1" step="0.0001" data-i18n-aria-label="aria.feed" aria-label="F（供給率）" />
+              <span class="nudge-buttons" data-i18n-aria-label="aria.feedNudge" aria-label="Fを微調整">
+                <button type="button" data-nudge="feed" data-amount="-0.0001">−</button>
+                <button type="button" data-nudge="feed" data-amount="0.0001">+</button>
+              </span>
+              <input id="feedNumber" type="number" min="0.01" max="0.1" step="0.0001" data-i18n-aria-label="aria.feedNumber" aria-label="F（供給率）の数値" />
+            </div>
+            <div class="slider-row fine-slider-row">
+              <span data-i18n="control.kill">k（除去率）</span>
+              <input id="kill" type="range" min="0.03" max="0.085" step="0.0001" data-i18n-aria-label="aria.kill" aria-label="k（除去率）" />
+              <span class="nudge-buttons" data-i18n-aria-label="aria.killNudge" aria-label="kを微調整">
+                <button type="button" data-nudge="kill" data-amount="-0.0001">−</button>
+                <button type="button" data-nudge="kill" data-amount="0.0001">+</button>
+              </span>
+              <input id="killNumber" type="number" min="0.03" max="0.085" step="0.0001" data-i18n-aria-label="aria.killNumber" aria-label="k（除去率）の数値" />
+            </div>
+            <label class="slider-row">
+              <span data-i18n="control.threshold">表示しきい値</span>
+              <input id="threshold" type="range" min="0.001" max="0.7" step="0.001" />
+              <input id="thresholdNumber" type="number" min="0.001" max="0.7" step="0.001" />
+            </label>
+            <label class="slider-row">
+              <span data-i18n="control.speed">ステップ/表示</span>
+              <input id="speed" type="range" min="1" max="200" step="1" />
+              <input id="speedNumber" type="number" min="1" max="200" step="1" />
+            </label>
+            <label class="control-select">
+              <span id="boundaryLabel" data-i18n="control.boundary">境界条件</span>
+              <select id="boundary" aria-labelledby="boundaryLabel">
+                <option value="neumann" data-i18n="option.neumann">Neumann: 端で反射</option>
+                <option value="periodic" selected data-i18n="option.periodic">Periodic: 反対側へ接続</option>
+              </select>
+            </label>
+          </section>
+
+          <details class="advanced-controls">
+            <summary data-i18n="control.advanced">詳細設定</summary>
+            <div class="advanced-controls__body">
+              <label class="slider-row">
+                <span data-i18n="control.du">拡散 U</span>
+                <input id="du" type="range" min="0.000005" max="0.0003" step="0.000001" />
+                <input id="duNumber" type="number" min="0.000005" max="0.0003" step="0.000001" />
+              </label>
+              <label class="slider-row">
+                <span data-i18n="control.dv">拡散 V</span>
+                <input id="dv" type="range" min="0.000002" max="0.0002" step="0.000001" />
+                <input id="dvNumber" type="number" min="0.000002" max="0.0002" step="0.000001" />
+              </label>
+              <div class="compact-grid">
+                <label>
+                  <span id="gridSizeLabel" data-i18n="control.grid">格子</span>
+                  <select id="gridSize" aria-labelledby="gridSizeLabel">
+                    <option value="64" selected>64³</option>
+                    <option value="100">100³</option>
+                  </select>
+                </label>
+                <label>
+                  <span id="dxLabel" data-i18n="control.dx">空間刻み dx</span>
+                  <input id="dx" type="number" min="0.005" max="0.05" step="0.0001" aria-labelledby="dxLabel" />
+                </label>
+                <label>
+                  <span id="seedLabel" data-i18n="control.seed">seed</span>
+                  <input id="seed" type="number" min="1" max="4294967295" step="1" aria-labelledby="seedLabel" />
+                </label>
+              </div>
+            </div>
+          </details>
+        </aside>
+
+        <section class="stage" data-i18n-aria-label="aria.stage" aria-label="3D表示">
+          <div class="viewer">
+            <canvas id="volumeCanvas"></canvas>
+            <div class="viewer__hud">
+              <span id="runningBadge" data-i18n="status.stopped">停止中</span>
+              <span id="stepCounter">step 0</span>
+            </div>
+            <div class="viewer__hint" data-i18n="viewer.hint">ドラッグで回転、ホイールで拡大</div>
+          </div>
+
+          <div class="transport" data-i18n-aria-label="aria.transport" aria-label="操作">
+            <button id="runPause" class="primary" type="button" data-i18n="button.play">再生</button>
+            <button id="reset" type="button" data-i18n="button.reset">リセット</button>
+            <button id="randomSeed" type="button" data-i18n="button.randomSeed">別の種</button>
+            <button id="exportImage" type="button" data-i18n="button.export">画像保存</button>
+          </div>
+
+          <div class="slice-strip" data-i18n-aria-label="aria.slices" aria-label="断面">
+            <figure>
+              <canvas id="sliceXY" width="160" height="160"></canvas>
+              <figcaption data-i18n="slice.xy">XY / Z中央</figcaption>
+            </figure>
+            <figure>
+              <canvas id="sliceXZ" width="160" height="160"></canvas>
+              <figcaption data-i18n="slice.xz">XZ / Y中央</figcaption>
+            </figure>
+            <figure>
+              <canvas id="sliceYZ" width="160" height="160"></canvas>
+              <figcaption data-i18n="slice.yz">YZ / X中央</figcaption>
+            </figure>
+          </div>
+        </section>
+
+        <aside class="panel side-panel" data-i18n-aria-label="aria.side" aria-label="状態とリンク">
+          <section class="quick-guide">
+            <h2 data-i18n="side.overview">Overview</h2>
+            <p data-i18n="side.summary">
+              V 濃度場を Volume または等値面で表示します。プリセットを起点に F と k を動かして、3次元パターンの変化を比較できます。
+            </p>
+            <a class="feature-link" href="/about.html" data-i18n="side.about">解説と参考文献</a>
+          </section>
+
+          <section class="metrics">
+            <h2 data-i18n="metrics.title">状態</h2>
+            <div><span data-i18n="metrics.maxV">V 最大</span><strong id="maxV">0.000</strong></div>
+            <div><span data-i18n="metrics.avgV">V 平均</span><strong id="avgV">0.000</strong></div>
+            <div><span data-i18n="metrics.activeV">表示点</span><strong id="activeV">0%</strong></div>
+          </section>
+
+          <footer class="site-footer">
+            <a href="https://github.com/dueyama/gray-scott-3d" target="_blank" rel="noreferrer" data-i18n="nav.github">GitHub</a>
+            <small>© 2026 Daishin Ueyama</small>
+          </footer>
+        </aside>
+      </main>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

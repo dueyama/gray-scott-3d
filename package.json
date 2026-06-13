@@ -1,0 +1,27 @@
+{
+  "name": "gs3d",
+  "version": "0.1.0",
+  "description": "Educational browser app for exploring three-dimensional Gray-Scott reaction-diffusion patterns.",
+  "license": "MIT",
+  "private": true,
+  "homepage": "https://github.com/dueyama/gray-scott-3d#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dueyama/gray-scott-3d.git"
+  },
+  "bugs": {
+    "url": "https://github.com/dueyama/gray-scott-3d/issues"
+  },
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "vite build",
+    "preview": "vite preview --host 127.0.0.1"
+  },
+  "dependencies": {
+    "three": "^0.179.1"
+  },
+  "devDependencies": {
+    "vite": "^8.0.16"
+  }
+}
