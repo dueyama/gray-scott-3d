@@ -4,7 +4,7 @@
   "description": "Educational browser app for exploring three-dimensional Gray-Scott reaction-diffusion patterns.",
   "license": "MIT",
   "private": true,
-  "homepage": "https://github.com/dueyama/gray-scott-3d#readme",
+  "homepage": "https://gray-scott-3d.vercel.app/",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/dueyama/gray-scott-3d.git"
@@ -19,6 +19,7 @@
     "preview": "vite preview --host 127.0.0.1"
   },
   "dependencies": {
+    "@vercel/analytics": "^2.0.1",
     "three": "^0.179.1"
   },
   "devDependencies": {

@@ -1,4 +1,5 @@
 import "./styles.css";
+import "./pageSignals.js";
 import { getLocale, setupI18n, translate } from "./i18n.js";
 import { DEFAULT_STATE, PRESETS } from "./presets.js";
 import { VolumeRenderer } from "./volumeRenderer.js";

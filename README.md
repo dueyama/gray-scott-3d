@@ -4,6 +4,8 @@ An educational browser app for exploring three-dimensional Gray-Scott reaction-d
 
 日本語: 3次元 Gray-Scott 反応拡散モデルのパターンをブラウザで観察するための教育向け Web アプリです。
 
+Live demo: https://gray-scott-3d.vercel.app/
+
 ## Overview
 
 The Gray-Scott model is a reaction-diffusion system in which autocatalytic reaction terms and diffusion can generate rich spatial patterns. This app focuses on the three-dimensional case and renders regions where the concentration of `V` becomes visible.
