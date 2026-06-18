@@ -170,6 +170,25 @@
             </dl>
           </section>
 
+          <section class="about-section">
+            <h2 data-i18n="about.compute.title">計算方式</h2>
+            <p data-i18n-html="about.compute.p1">
+              計算は差分陽解法です。各格子点では現在の U、V と6方向の隣接点を読み、拡散、反応、供給、除去の項を使って次の時刻の値を求めます。このような局所的なステンシル計算は、CPU でも GPU でも実装しやすい形です。
+            </p>
+            <p data-i18n-html="about.compute.p2">
+              CPU モードでは Web Worker 上で <code>Float32Array</code> の U、V 配列を更新します。画面本体とは別スレッドで計算するため、ブラウザの操作を止めにくくしています。
+            </p>
+            <p data-i18n-html="about.compute.p3">
+              GPGPU モードでは WebGL2 を計算にも使います。U と V を <code>RGBA32F</code> の2次元テクスチャに詰め、fragment shader で1ステップ分の Gray-Scott 更新を行い、2枚のテクスチャを ping-pong しながら交互に読み書きします。
+            </p>
+            <p data-i18n-html="about.compute.p4">
+              ただし現在の実装は、表示するたびに V の濃度場を GPU から読み戻し、既存の Three.js の <code>Data3DTexture</code>、断面図、Marching Cubes 表示へ渡しています。そのため完全に GPU 上だけで完結する構成ではありません。処理時間、転送/変換、更新速度は、この読み戻しも含めた実測値として CPU と GPGPU を比較するための目安です。
+            </p>
+            <p data-i18n-html="about.compute.p5">
+              この Gray-Scott 計算では特に GPGPU の効果が出やすくなります。更新は各格子点でほぼ独立しており、必要なのは自分自身と隣接6点の値だけです。さらに今回は ICCG のような大域的な線形方程式ソルバを使わず、同じ陽的な更新式を多数の格子点に繰り返し適用するため、GPU の並列計算と相性がよくなります。現在のプリセットでは U と V の拡散係数が同じ桁で、反応項にも極端に大きな速度定数が入っていないため、陽解法でも比較的大きな時間刻みを取れることも、ブラウザ上で動かしやすい理由です。
+            </p>
+          </section>
+
           <section class="about-section references">
             <h2 data-i18n="about.refs.title">参考文献・読み物</h2>
             <ol>

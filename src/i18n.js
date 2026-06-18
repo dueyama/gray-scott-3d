@@ -122,6 +122,17 @@ const translations = {
     "about.control.view": "Volume / surface",
     "about.control.view.desc":
       "Volume mode accumulates the concentration field like a luminous cloud. Surface mode draws a mesh at a single concentration level.",
+    "about.compute.title": "Computation backend",
+    "about.compute.p1":
+      "The simulation uses an explicit finite-difference update. At each grid point it reads the current U and V values plus the six neighboring points, then advances diffusion, reaction, feed, and removal terms to the next time step. This local stencil update is suitable for both CPU and GPU execution.",
+    "about.compute.p2":
+      "CPU mode updates the U and V <code>Float32Array</code> fields in a Web Worker. Running the numerical loop outside the main browser thread helps keep the interface responsive.",
+    "about.compute.p3":
+      "GPGPU mode also uses WebGL2 for the numerical update. U and V are packed into an <code>RGBA32F</code> 2D texture, a fragment shader performs one Gray-Scott step, and two textures are alternated as ping-pong framebuffers for repeated updates.",
+    "about.compute.p4":
+      "The current implementation still reads the displayed V field back from the GPU each frame so it can reuse the existing Three.js <code>Data3DTexture</code> renderer, slice views, and Marching Cubes surface mode. It is therefore not a fully GPU-resident pipeline. The frame time, readback, and throughput values in the app are live measurements for comparing CPU and GPGPU behavior on the current browser and GPU.",
+    "about.compute.p5":
+      "This Gray-Scott update is especially favorable for GPGPU execution. Each grid point can be advanced almost independently, using only its own value and the six nearest neighbors. Because this browser version uses an explicit update rather than a global linear solver such as ICCG, the same small calculation can be applied to many grid points in parallel. In the current presets, the U and V diffusion coefficients are on the same order of magnitude, and the reaction terms do not contain extremely large rate constants. That also allows a relatively large explicit time step, which helps the simulation move well in the browser.",
     "about.ref.mrob.note":
       "A visual catalogue of many two-dimensional Gray-Scott patterns. The parameter map should not be read as a direct guide to the 3D presets here.",
     "about.ref.youtube.note": "An older playlist of simulation result videos by Daishin Ueyama.",
@@ -245,6 +256,17 @@ const translations = {
     "about.control.boundary.desc": "Neumann は箱の端で反射、Periodic は反対側の面へつながる空間として扱います。",
     "about.control.view": "Volume / 等値面",
     "about.control.view.desc": "Volume は濃度場を雲のように積分表示し、等値面は同じ濃度の面をメッシュとして描きます。",
+    "about.compute.title": "計算方式",
+    "about.compute.p1":
+      "計算は差分陽解法です。各格子点では現在の U、V と6方向の隣接点を読み、拡散、反応、供給、除去の項を使って次の時刻の値を求めます。このような局所的なステンシル計算は、CPU でも GPU でも実装しやすい形です。",
+    "about.compute.p2":
+      "CPU モードでは Web Worker 上で <code>Float32Array</code> の U、V 配列を更新します。画面本体とは別スレッドで計算するため、ブラウザの操作を止めにくくしています。",
+    "about.compute.p3":
+      "GPGPU モードでは WebGL2 を計算にも使います。U と V を <code>RGBA32F</code> の2次元テクスチャに詰め、fragment shader で1ステップ分の Gray-Scott 更新を行い、2枚のテクスチャを ping-pong しながら交互に読み書きします。",
+    "about.compute.p4":
+      "ただし現在の実装は、表示するたびに V の濃度場を GPU から読み戻し、既存の Three.js の <code>Data3DTexture</code>、断面図、Marching Cubes 表示へ渡しています。そのため完全に GPU 上だけで完結する構成ではありません。処理時間、転送/変換、更新速度は、この読み戻しも含めた実測値として CPU と GPGPU を比較するための目安です。",
+    "about.compute.p5":
+      "この Gray-Scott 計算では特に GPGPU の効果が出やすくなります。更新は各格子点でほぼ独立しており、必要なのは自分自身と隣接6点の値だけです。さらに今回は ICCG のような大域的な線形方程式ソルバを使わず、同じ陽的な更新式を多数の格子点に繰り返し適用するため、GPU の並列計算と相性がよくなります。現在のプリセットでは U と V の拡散係数が同じ桁で、反応項にも極端に大きな速度定数が入っていないため、陽解法でも比較的大きな時間刻みを取れることも、ブラウザ上で動かしやすい理由です。",
     "about.ref.mrob.note":
       "2次元 Gray-Scott パターンを豊富な図例で見せてくれるサイト。ただし、このパラメータ図を3次元プリセットへ直接対応させるものではありません。",
     "about.ref.youtube.note": "上山大信による、かなり古いシミュレーション結果の動画プレイリスト。",
