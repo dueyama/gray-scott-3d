@@ -18,6 +18,7 @@ The goal is public exploration rather than research-grade numerical analysis. Th
 - Three.js / WebGL2 volume rendering
 - Optional Marching Cubes isosurface view
 - Switchable CPU Worker and WebGL2 GPGPU simulation backends with live timing metrics
+- GPGPU is used by default when available, with automatic fallback to CPU mode
 - Adjustable `F`, `k`, display threshold, simulation speed, and boundary condition
 - Neumann and periodic boundary modes
 - Reproducible initial conditions using a seeded Mersenne Twister

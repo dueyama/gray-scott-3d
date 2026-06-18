@@ -13,7 +13,7 @@ let latestVolume = null;
 let latestSize = state.gridSize;
 let latestStep = 0;
 let renderMode = "volume";
-let computeBackend = "cpu";
+let computeBackend = "gpgpu";
 let engine = null;
 const controlUpdaters = new Map();
 const displayPrecision = {
@@ -235,16 +235,16 @@ function updatePressedStates() {
 }
 
 function sendConfig() {
-  engine?.configure({ ...state });
+  safeEngineCall(() => engine?.configure({ ...state }));
 }
 
 function resetSimulation() {
-  engine?.reset({ ...state });
+  safeEngineCall(() => engine?.reset({ ...state }));
 }
 
 function setRunning(nextRunning) {
   running = nextRunning;
-  engine?.setRunning(running);
+  safeEngineCall(() => engine?.setRunning(running));
   syncDynamicText();
 }
 
@@ -255,24 +255,48 @@ function setComputeBackend(nextBackend) {
   const shouldResume = running;
   engine?.setRunning(false);
   engine?.dispose();
+  engine = null;
 
   try {
     engine =
       requestedBackend === "gpgpu"
-        ? new GpuSimulationEngine(handleSimulationFrame)
+        ? new GpuSimulationEngine(handleSimulationFrame, (error) => fallbackToCpu(error, running))
         : new CpuSimulationEngine(handleSimulationFrame);
     computeBackend = requestedBackend;
     elements.gpuBackend.disabled = false;
     engine.reset({ ...state });
   } catch (error) {
-    console.warn(error);
-    engine?.dispose();
-    engine = new CpuSimulationEngine(handleSimulationFrame);
-    computeBackend = "cpu";
-    elements.gpuBackend.disabled = true;
-    engine.reset({ ...state });
+    fallbackToCpu(error, shouldResume);
+    return;
   }
 
+  if (shouldResume) {
+    engine.setRunning(true);
+  }
+  updateBackendUi();
+  syncDynamicText();
+}
+
+function safeEngineCall(callback) {
+  try {
+    callback();
+  } catch (error) {
+    if (computeBackend === "gpgpu") {
+      fallbackToCpu(error, running);
+      return;
+    }
+    throw error;
+  }
+}
+
+function fallbackToCpu(error, shouldResume) {
+  console.warn(error);
+  engine?.setRunning(false);
+  engine?.dispose();
+  engine = new CpuSimulationEngine(handleSimulationFrame);
+  computeBackend = "cpu";
+  elements.gpuBackend.disabled = true;
+  engine.reset({ ...state });
   if (shouldResume) {
     engine.setRunning(true);
   }

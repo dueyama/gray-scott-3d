@@ -10,7 +10,7 @@ The public web app lives in `src/`. A local copy of the legacy C implementation 
 
 - App framework: Vite
 - Rendering: Three.js, WebGL2, `THREE.Data3DTexture`
-- Simulation: explicit finite-difference Euler update, selectable between a CPU Web Worker backend and a WebGL2 GPGPU backend
+- Simulation: explicit finite-difference Euler update, selectable between a CPU Web Worker backend and a WebGL2 GPGPU backend. GPGPU is the default when available; CPU is the fallback.
 - Randomness: deterministic Mersenne Twister with a user-visible seed
 - Deployment target: GitHub public repository, then Vercel static deployment
 

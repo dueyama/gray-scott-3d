@@ -95,8 +95,9 @@ void main() {
 `;
 
 export class GpuSimulationEngine {
-  constructor(onFrame) {
+  constructor(onFrame, onError) {
     this.onFrame = onFrame;
+    this.onError = onError;
     this.canvas = document.createElement("canvas");
     this.gl = this.canvas.getContext("webgl2", {
       antialias: false,
@@ -249,23 +250,27 @@ export class GpuSimulationEngine {
   loop() {
     if (!this.running) return;
 
-    const steps = Math.max(1, Number(this.config.speed) | 0);
-    const startedAt = performance.now();
-    this.advance(steps);
-    const computeMs = performance.now() - startedAt;
-    this.stepCount += steps;
+    try {
+      const steps = Math.max(1, Number(this.config.speed) | 0);
+      const startedAt = performance.now();
+      this.advance(steps);
+      const computeMs = performance.now() - startedAt;
+      this.stepCount += steps;
 
-    const frameStartedAt = performance.now();
-    this.postFrame({
-      steps,
-      computeMs,
-      readbackMs: 0,
-      totalMs: 0,
-      cellsPerSecond: null
-    });
-    const totalMs = performance.now() - startedAt;
-    const delay = Math.max(0, 16 - totalMs);
-    this.timer = window.setTimeout(() => this.loop(), delay);
+      this.postFrame({
+        steps,
+        computeMs,
+        readbackMs: 0,
+        totalMs: 0,
+        cellsPerSecond: null
+      });
+      const totalMs = performance.now() - startedAt;
+      const delay = Math.max(0, 16 - totalMs);
+      this.timer = window.setTimeout(() => this.loop(), delay);
+    } catch (error) {
+      this.running = false;
+      this.onError?.(error);
+    }
   }
 
   advance(steps) {
