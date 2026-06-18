@@ -1,5 +1,7 @@
 import "./styles.css";
 import "./pageSignals.js";
+import { CpuSimulationEngine } from "./cpuSimulationEngine.js";
+import { GpuSimulationEngine } from "./gpuSimulationEngine.js";
 import { getLocale, setupI18n, translate } from "./i18n.js";
 import { DEFAULT_STATE, PRESETS } from "./presets.js";
 import { VolumeRenderer } from "./volumeRenderer.js";
@@ -11,6 +13,8 @@ let latestVolume = null;
 let latestSize = state.gridSize;
 let latestStep = 0;
 let renderMode = "volume";
+let computeBackend = "cpu";
+let engine = null;
 const controlUpdaters = new Map();
 const displayPrecision = {
   feed: 4,
@@ -51,8 +55,15 @@ const elements = {
   exportImage: document.querySelector("#exportImage"),
   volumeMode: document.querySelector("#volumeMode"),
   surfaceMode: document.querySelector("#surfaceMode"),
+  cpuBackend: document.querySelector("#cpuBackend"),
+  gpuBackend: document.querySelector("#gpuBackend"),
   runningBadge: document.querySelector("#runningBadge"),
+  engineBadge: document.querySelector("#engineBadge"),
   stepCounter: document.querySelector("#stepCounter"),
+  backendMetric: document.querySelector("#backendMetric"),
+  computeMs: document.querySelector("#computeMs"),
+  readbackMs: document.querySelector("#readbackMs"),
+  cellsPerSecond: document.querySelector("#cellsPerSecond"),
   maxV: document.querySelector("#maxV"),
   avgV: document.querySelector("#avgV"),
   activeV: document.querySelector("#activeV"),
@@ -65,18 +76,6 @@ const elements = {
 setupI18n({ onLocaleChange: handleLocaleChange });
 
 const renderer = createRenderer();
-const worker = new Worker(new URL("./simWorker.js", import.meta.url), { type: "module" });
-
-worker.addEventListener("message", (event) => {
-  if (event.data.type !== "frame") return;
-  latestSize = event.data.size;
-  latestStep = event.data.step;
-  latestVolume = new Uint8Array(event.data.buffer);
-  renderer?.updateVolume(latestVolume, latestSize);
-  drawSlices(latestVolume, latestSize);
-  updateMetrics(event.data.metrics);
-  updateStepCounter();
-});
 
 function createRenderer() {
   try {
@@ -180,6 +179,8 @@ function bindControls() {
   elements.reset.addEventListener("click", resetSimulation);
   elements.volumeMode.addEventListener("click", () => setRenderMode("volume"));
   elements.surfaceMode.addEventListener("click", () => setRenderMode("surface"));
+  elements.cpuBackend.addEventListener("click", () => setComputeBackend("cpu"));
+  elements.gpuBackend.addEventListener("click", () => setComputeBackend("gpgpu"));
   document.querySelectorAll("[data-nudge]").forEach((button) => {
     button.addEventListener("click", () => {
       const key = button.dataset.nudge;
@@ -234,17 +235,60 @@ function updatePressedStates() {
 }
 
 function sendConfig() {
-  worker.postMessage({ type: "configure", payload: { ...state } });
+  engine?.configure({ ...state });
 }
 
 function resetSimulation() {
-  worker.postMessage({ type: "reset", payload: { ...state } });
+  engine?.reset({ ...state });
 }
 
 function setRunning(nextRunning) {
   running = nextRunning;
-  worker.postMessage({ type: "run", payload: running });
+  engine?.setRunning(running);
   syncDynamicText();
+}
+
+function setComputeBackend(nextBackend) {
+  const requestedBackend = nextBackend === "gpgpu" ? "gpgpu" : "cpu";
+  if (engine && requestedBackend === computeBackend) return;
+
+  const shouldResume = running;
+  engine?.setRunning(false);
+  engine?.dispose();
+
+  try {
+    engine =
+      requestedBackend === "gpgpu"
+        ? new GpuSimulationEngine(handleSimulationFrame)
+        : new CpuSimulationEngine(handleSimulationFrame);
+    computeBackend = requestedBackend;
+    elements.gpuBackend.disabled = false;
+    engine.reset({ ...state });
+  } catch (error) {
+    console.warn(error);
+    engine?.dispose();
+    engine = new CpuSimulationEngine(handleSimulationFrame);
+    computeBackend = "cpu";
+    elements.gpuBackend.disabled = true;
+    engine.reset({ ...state });
+  }
+
+  if (shouldResume) {
+    engine.setRunning(true);
+  }
+  updateBackendUi();
+  syncDynamicText();
+}
+
+function handleSimulationFrame(frame) {
+  latestSize = frame.size;
+  latestStep = frame.step;
+  latestVolume = frame.volume;
+  renderer?.updateVolume(latestVolume, latestSize);
+  drawSlices(latestVolume, latestSize);
+  updateMetrics(frame.metrics);
+  updatePerformance(frame.performance);
+  updateStepCounter();
 }
 
 function setRenderMode(nextMode) {
@@ -260,6 +304,27 @@ function updateMetrics(metrics) {
   elements.activeV.textContent = `${Math.round(metrics.active * 100)}%`;
 }
 
+function updatePerformance(performanceInfo) {
+  if (!performanceInfo || !performanceInfo.steps) {
+    elements.computeMs.textContent = "—";
+    elements.readbackMs.textContent = "—";
+    elements.cellsPerSecond.textContent = "—";
+    return;
+  }
+
+  elements.computeMs.textContent = `${performanceInfo.computeMs.toFixed(1)} ms`;
+  elements.readbackMs.textContent = `${performanceInfo.readbackMs.toFixed(1)} ms`;
+  elements.cellsPerSecond.textContent = formatThroughput(performanceInfo.cellsPerSecond);
+}
+
+function formatThroughput(value) {
+  if (!Number.isFinite(value) || value <= 0) return "—";
+  if (value >= 1_000_000_000) return `${(value / 1_000_000_000).toFixed(2)}G/s`;
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M/s`;
+  if (value >= 1_000) return `${(value / 1_000).toFixed(1)}k/s`;
+  return `${Math.round(value)}/s`;
+}
+
 function updateStepCounter() {
   const locale = getLocale() === "jp" ? "ja-JP" : "en-US";
   elements.stepCounter.textContent = `${translate("step.label")} ${latestStep.toLocaleString(locale)}`;
@@ -268,12 +333,21 @@ function updateStepCounter() {
 function syncDynamicText() {
   elements.runPause.textContent = running ? translate("button.pause") : translate("button.play");
   elements.runningBadge.textContent = running ? translate("status.running") : translate("status.stopped");
+  updateBackendUi();
   updateStepCounter();
 }
 
 function handleLocaleChange() {
   setupPresets();
   syncDynamicText();
+}
+
+function updateBackendUi() {
+  const label = computeBackend === "gpgpu" ? "GPGPU" : "CPU";
+  elements.cpuBackend.setAttribute("aria-pressed", String(computeBackend === "cpu"));
+  elements.gpuBackend.setAttribute("aria-pressed", String(computeBackend === "gpgpu"));
+  elements.engineBadge.textContent = label;
+  elements.backendMetric.textContent = label;
 }
 
 function drawSlices(volume, size) {
@@ -338,6 +412,7 @@ function animate() {
 
 setupPresets();
 bindControls();
+setComputeBackend(computeBackend);
 applyState(state, true);
 setRenderMode(renderMode);
 setRunning(false);

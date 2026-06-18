@@ -54,6 +54,15 @@
             </div>
           </section>
 
+          <section class="mode-section">
+            <h2 data-i18n="section.compute">計算</h2>
+            <div class="view-mode" data-i18n-aria-label="aria.computeMode" aria-label="計算方式">
+              <button id="cpuBackend" type="button" aria-pressed="true" data-i18n="compute.cpu">CPU</button>
+              <button id="gpuBackend" type="button" aria-pressed="false" data-i18n="compute.gpgpu">GPGPU</button>
+            </div>
+            <p class="mode-note" data-i18n="compute.note">切り替えると同じ seed とパラメータで再計算します。</p>
+          </section>
+
           <section class="control-list">
             <h2 data-i18n="section.parameters">パラメータ</h2>
             <div class="slider-row fine-slider-row">
@@ -132,6 +141,7 @@
             <canvas id="volumeCanvas"></canvas>
             <div class="viewer__hud">
               <span id="runningBadge" data-i18n="status.stopped">停止中</span>
+              <span id="engineBadge">CPU</span>
               <span id="stepCounter">step 0</span>
             </div>
             <div class="viewer__hint" data-i18n="viewer.hint">ドラッグで回転、ホイールで拡大</div>
@@ -171,6 +181,10 @@
 
           <section class="metrics">
             <h2 data-i18n="metrics.title">状態</h2>
+            <div><span data-i18n="metrics.backend">計算方式</span><strong id="backendMetric">CPU</strong></div>
+            <div><span data-i18n="metrics.computeMs">計算時間</span><strong id="computeMs">—</strong></div>
+            <div><span data-i18n="metrics.readbackMs">転送/変換</span><strong id="readbackMs">—</strong></div>
+            <div><span data-i18n="metrics.cellsPerSecond">更新速度</span><strong id="cellsPerSecond">—</strong></div>
             <div><span data-i18n="metrics.maxV">V 最大</span><strong id="maxV">0.000</strong></div>
             <div><span data-i18n="metrics.avgV">V 平均</span><strong id="avgV">0.000</strong></div>
             <div><span data-i18n="metrics.activeV">表示点</span><strong id="activeV">0%</strong></div>
