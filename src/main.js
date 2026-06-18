@@ -312,7 +312,7 @@ function updatePerformance(performanceInfo) {
     return;
   }
 
-  elements.computeMs.textContent = `${performanceInfo.computeMs.toFixed(1)} ms`;
+  elements.computeMs.textContent = `${performanceInfo.totalMs.toFixed(1)} ms`;
   elements.readbackMs.textContent = `${performanceInfo.readbackMs.toFixed(1)} ms`;
   elements.cellsPerSecond.textContent = formatThroughput(performanceInfo.cellsPerSecond);
 }

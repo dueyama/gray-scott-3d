@@ -31,12 +31,13 @@ function configure(nextConfig) {
     nextV = new Float32Array(count);
     updateNeighbors();
     reset();
-    return;
+    return true;
   }
   if (previousBoundary !== config.boundary) {
     updateNeighbors();
   }
   postFrame();
+  return false;
 }
 
 function updateNeighbors() {
@@ -142,6 +143,7 @@ function postFrame(performanceInfo = null) {
     bytes[i] = Math.max(0, Math.min(255, Math.round(value * 255)));
   }
   const packMs = performance.now() - readStartedAt;
+  const totalMs = performanceInfo ? performanceInfo.computeMs + packMs : 0;
 
   self.postMessage(
     {
@@ -158,7 +160,11 @@ function postFrame(performanceInfo = null) {
         ? {
             ...performanceInfo,
             readbackMs: packMs,
-            totalMs: performanceInfo.computeMs + packMs
+            totalMs,
+            cellsPerSecond:
+              totalMs > 0
+                ? (performanceInfo.steps * count) / (totalMs / 1000)
+                : Number.POSITIVE_INFINITY
           }
         : null
     },
@@ -179,8 +185,7 @@ function loop() {
     computeMs,
     readbackMs: 0,
     totalMs: computeMs,
-    cellsPerSecond:
-      computeMs > 0 ? (steps * count) / (computeMs / 1000) : Number.POSITIVE_INFINITY
+    cellsPerSecond: null
   });
   timer = self.setTimeout(loop, 16);
 }
@@ -190,8 +195,8 @@ self.onmessage = (event) => {
   if (type === "configure") {
     configure(payload);
   } else if (type === "reset") {
-    if (payload) configure(payload);
-    reset();
+    const alreadyReset = payload ? configure(payload) : false;
+    if (!alreadyReset) reset();
   } else if (type === "run") {
     running = Boolean(payload);
     self.clearTimeout(timer);

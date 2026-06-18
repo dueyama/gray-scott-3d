@@ -10,7 +10,7 @@ The public web app lives in `src/`. A local copy of the legacy C implementation 
 
 - App framework: Vite
 - Rendering: Three.js, WebGL2, `THREE.Data3DTexture`
-- Simulation: explicit finite-difference Euler update in a Web Worker
+- Simulation: explicit finite-difference Euler update, selectable between a CPU Web Worker backend and a WebGL2 GPGPU backend
 - Randomness: deterministic Mersenne Twister with a user-visible seed
 - Deployment target: GitHub public repository, then Vercel static deployment
 
@@ -67,12 +67,15 @@ The primary visualization should remain volume raymarching, not a CPU-generated 
 
 Current pipeline:
 
-1. Worker computes `U` and `V` as `Float32Array`.
-2. Worker quantizes `V` to `Uint8Array`.
-3. Main thread uploads it into a Three.js `Data3DTexture`.
-4. Fragment shader raymarches through a cube and accumulates color/opacity above a visible threshold.
-5. Optional isosurface mode uses Three.js `MarchingCubes` on the quantized `V` field with `isolation = threshold * 0.5 * 255`, because the mesh needs a lower cutoff than the volume shader's perceptual threshold.
-6. 2D slice canvases show central XY/XZ/YZ cuts as a fallback explanation aid.
+1. CPU mode computes `U` and `V` as `Float32Array` in `simWorker.js`.
+2. GPGPU mode packs `U,V` into WebGL2 `RGBA32F` textures and advances them with a fragment-shader stencil update using ping-pong framebuffers.
+3. Both modes quantize/read back `V` to `Uint8Array` for the existing visualization path.
+4. Main thread uploads `V` into a Three.js `Data3DTexture`.
+5. Fragment shader raymarches through a cube and accumulates color/opacity above a visible threshold.
+6. Optional isosurface mode uses Three.js `MarchingCubes` on the quantized `V` field with `isolation = threshold * 0.5 * 255`, because the mesh needs a lower cutoff than the volume shader's perceptual threshold.
+7. 2D slice canvases show central XY/XZ/YZ cuts as a fallback explanation aid.
+
+The GPGPU backend is intended for interactive speed comparisons, but it still reads the field back to the CPU each displayed frame so it can reuse the existing `Data3DTexture`, slice, and Marching Cubes pipeline. Do not claim it is a fully GPU-resident renderer unless that architecture changes.
 
 Keep Marching Cubes as a separate optional view. It is CPU-bound, so do not update it more often than necessary during continuous simulation.
 

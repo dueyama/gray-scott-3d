@@ -261,8 +261,7 @@ export class GpuSimulationEngine {
       computeMs,
       readbackMs: 0,
       totalMs: 0,
-      cellsPerSecond:
-        computeMs > 0 ? (steps * this.count) / (computeMs / 1000) : Number.POSITIVE_INFINITY
+      cellsPerSecond: null
     });
     const totalMs = performance.now() - startedAt;
     const delay = Math.max(0, 16 - totalMs);
@@ -328,8 +327,6 @@ export class GpuSimulationEngine {
     );
     gl.readPixels(0, 0, this.width, this.height, gl.RGBA, gl.FLOAT, this.readBuffer);
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    const readbackMs = performance.now() - readStartedAt;
-
     const bytes = new Uint8Array(this.count);
     let max = 0;
     let sum = 0;
@@ -343,6 +340,9 @@ export class GpuSimulationEngine {
       if (value >= threshold) active += 1;
       bytes[i] = Math.max(0, Math.min(255, Math.round(value * 255)));
     }
+    const readbackMs = performance.now() - readStartedAt;
+
+    const totalMs = (performanceInfo?.computeMs ?? 0) + readbackMs;
 
     this.onFrame({
       backend: "gpgpu",
@@ -357,7 +357,11 @@ export class GpuSimulationEngine {
       performance: {
         ...performanceInfo,
         readbackMs,
-        totalMs: (performanceInfo?.computeMs ?? 0) + readbackMs
+        totalMs,
+        cellsPerSecond:
+          performanceInfo?.steps && totalMs > 0
+            ? (performanceInfo.steps * this.count) / (totalMs / 1000)
+            : null
       }
     });
   }

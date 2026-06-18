@@ -17,6 +17,7 @@ The goal is public exploration rather than research-grade numerical analysis. Th
 - 3D Gray-Scott simulation running in the browser
 - Three.js / WebGL2 volume rendering
 - Optional Marching Cubes isosurface view
+- Switchable CPU Worker and WebGL2 GPGPU simulation backends with live timing metrics
 - Adjustable `F`, `k`, display threshold, simulation speed, and boundary condition
 - Neumann and periodic boundary modes
 - Reproducible initial conditions using a seeded Mersenne Twister
@@ -44,11 +45,15 @@ Some presets use multiple spherical or elongated seeds to make three-dimensional
 
 The main view is GPU volume raymarching with Three.js and WebGL2.
 
-1. A Web Worker updates the 3D `U` and `V` fields.
-2. The `V` field is quantized to `Uint8Array`.
-3. The main thread uploads it as a `THREE.Data3DTexture`.
-4. A fragment shader accumulates color and opacity above the visible threshold.
-5. The isosurface mode uses the Three.js `MarchingCubes` addon to generate a mesh from the same `V` field.
+1. The selected simulation backend updates the 3D `U` and `V` fields.
+2. CPU mode runs the explicit stencil update in a Web Worker.
+3. GPGPU mode packs `U,V` into WebGL2 `RGBA32F` textures and advances them with a fragment shader and ping-pong framebuffers.
+4. The `V` field is quantized/read back to `Uint8Array`.
+5. The main thread uploads it as a `THREE.Data3DTexture`.
+6. A fragment shader accumulates color and opacity above the visible threshold.
+7. The isosurface mode uses the Three.js `MarchingCubes` addon to generate a mesh from the same `V` field.
+
+The GPGPU backend still reads back the displayed field each frame so the app can reuse the same volume renderer, slice views, and isosurface path. The UI reports compute time, transfer/conversion time, and approximate cell-update throughput for comparing CPU and GPGPU behavior on the current browser and GPU.
 
 Central XY, XZ, and YZ slice views are also shown as compact supporting views.
 
