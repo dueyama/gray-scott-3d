@@ -86,8 +86,9 @@ const fragmentShader = /* glsl */ `
 `;
 
 export class VolumeRenderer {
-  constructor(canvas) {
+  constructor(canvas, invalidate = () => {}) {
     this.canvas = canvas;
+    this.invalidate = invalidate;
     const context = canvas.getContext("webgl2", { antialias: true, alpha: true });
     if (!context) {
       throw new Error("WebGL2 is required for 3D volume textures.");
@@ -110,6 +111,9 @@ export class VolumeRenderer {
     this.controls.dampingFactor = 0.08;
     this.controls.minDistance = 1.25;
     this.controls.maxDistance = 4;
+    this.controls.addEventListener("start", () => this.invalidate(24));
+    this.controls.addEventListener("change", () => this.invalidate(8));
+    this.controls.addEventListener("end", () => this.invalidate(24));
 
     this.texture = this.createTexture(new Uint8Array(64 * 64 * 64), 64);
     this.material = new THREE.ShaderMaterial({
@@ -213,6 +217,7 @@ export class VolumeRenderer {
     if (this.mode === "surface") {
       this.updateSurface(false);
     }
+    this.invalidate(2);
   }
 
   setThreshold(value) {
@@ -221,6 +226,7 @@ export class VolumeRenderer {
     if (this.mode === "surface") {
       this.updateSurface(true);
     }
+    this.invalidate(2);
   }
 
   setMode(mode) {
@@ -230,6 +236,7 @@ export class VolumeRenderer {
     if (this.mode === "surface") {
       this.updateSurface(true);
     }
+    this.invalidate(2);
   }
 
   updateSurface(force) {
@@ -253,6 +260,7 @@ export class VolumeRenderer {
     this.surfaceMesh.isolation = this.thresholdToIsolation(this.material.uniforms.threshold.value);
     this.surfaceMesh.update();
     this.latestSurfaceUpdate = now;
+    this.invalidate(2);
   }
 
   resize() {
@@ -261,15 +269,18 @@ export class VolumeRenderer {
     this.camera.aspect = clientWidth / clientHeight;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(clientWidth, clientHeight, false);
+    this.invalidate(2);
   }
 
   render() {
-    this.controls.update();
+    const changed = this.controls.update();
     this.material.uniforms.cameraObjectPosition.value.copy(this.camera.position);
     this.renderer.render(this.scene, this.camera);
+    return changed;
   }
 
   capturePng() {
+    this.render();
     return this.canvas.toDataURL("image/png");
   }
 }

@@ -15,6 +15,8 @@ let latestStep = 0;
 let renderMode = "volume";
 let computeBackend = "gpgpu";
 let engine = null;
+let animationFrameId = 0;
+let renderFramesRemaining = 0;
 const controlUpdaters = new Map();
 const displayPrecision = {
   feed: 4,
@@ -79,7 +81,7 @@ const renderer = createRenderer();
 
 function createRenderer() {
   try {
-    return new VolumeRenderer(elements.volumeCanvas);
+    return new VolumeRenderer(elements.volumeCanvas, requestRender);
   } catch (error) {
     const parent = elements.volumeCanvas.parentElement;
     parent.classList.add("viewer--error");
@@ -245,6 +247,7 @@ function resetSimulation() {
 function setRunning(nextRunning) {
   running = nextRunning;
   safeEngineCall(() => engine?.setRunning(running));
+  requestRender(running ? 2 : 4);
   syncDynamicText();
 }
 
@@ -313,6 +316,7 @@ function handleSimulationFrame(frame) {
   updateMetrics(frame.metrics);
   updatePerformance(frame.performance);
   updateStepCounter();
+  requestRender(running ? 2 : 1);
 }
 
 function setRenderMode(nextMode) {
@@ -429,9 +433,28 @@ function exportImage() {
   link.click();
 }
 
-function animate() {
-  renderer?.render();
-  requestAnimationFrame(animate);
+function requestRender(frames = 1) {
+  renderFramesRemaining = Math.max(renderFramesRemaining, frames);
+  if (!animationFrameId) {
+    animationFrameId = requestAnimationFrame(renderLoop);
+  }
+}
+
+function renderLoop() {
+  animationFrameId = 0;
+  const controlsChanged = renderer?.render() ?? false;
+  if (renderFramesRemaining > 0) {
+    renderFramesRemaining -= 1;
+  }
+
+  if (running || controlsChanged || renderFramesRemaining > 0) {
+    if (controlsChanged) {
+      renderFramesRemaining = Math.max(renderFramesRemaining, 2);
+    }
+    if (!animationFrameId) {
+      animationFrameId = requestAnimationFrame(renderLoop);
+    }
+  }
 }
 
 setupPresets();
@@ -440,4 +463,4 @@ setComputeBackend(computeBackend);
 applyState(state, true);
 setRenderMode(renderMode);
 setRunning(false);
-animate();
+requestRender(2);
