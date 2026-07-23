@@ -11,6 +11,7 @@ The public web app lives in `src/`. A local copy of the legacy C implementation 
 - App framework: Vite
 - Rendering: Three.js and WebGL2; CPU mode uses `THREE.Data3DTexture`, while GPGPU volume mode samples the simulation atlas directly
 - Simulation: explicit finite-difference Euler update, selectable between a CPU Web Worker backend and a WebGL2 GPGPU backend. GPGPU is the default when available; CPU is the fallback.
+- Quality: `Auto` selects an initial phone, tablet, or desktop profile and may step down based on sustained frame timing; manual high-quality and power-saving modes are also available.
 - Randomness: deterministic Mersenne Twister with a user-visible seed
 - Deployment target: GitHub public repository, then Vercel static deployment
 
@@ -77,6 +78,8 @@ Current pipeline:
 8. 2D slice canvases show central XY/XZ/YZ cuts as a fallback explanation aid.
 
 The main GPGPU volume path is GPU-resident between periodic supporting-view snapshots. Marching Cubes and the 2D slice canvases still depend on CPU snapshots, so do not claim the entire app is fully GPU-resident.
+
+Device quality profiles may change pixel ratio, raymarching steps, snapshot interval, and the number of GPGPU steps submitted in one main-thread chunk. They must not change `N`, `dt`, `F`, `k`, initial conditions, boundaries, or the numerical step order. Keep long GPGPU batches time-sliced on mobile profiles so UI events can run between chunks.
 
 Keep Marching Cubes as a separate optional view. It is CPU-bound, so do not update it more often than necessary during continuous simulation.
 

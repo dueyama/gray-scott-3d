@@ -105,6 +105,14 @@
           <details class="advanced-controls">
             <summary data-i18n="control.advanced">詳細設定</summary>
             <div class="advanced-controls__body">
+              <label class="control-select">
+                <span id="qualityModeLabel" data-i18n="control.quality">描画品質</span>
+                <select id="qualityMode" aria-labelledby="qualityModeLabel">
+                  <option value="auto" selected data-i18n="option.qualityAuto">Auto</option>
+                  <option value="high" data-i18n="option.qualityHigh">高品質</option>
+                  <option value="economy" data-i18n="option.qualityEconomy">省電力</option>
+                </select>
+              </label>
               <label class="slider-row">
                 <span data-i18n="control.du">拡散 U</span>
                 <input id="du" type="range" min="0.000005" max="0.0003" step="0.000001" />

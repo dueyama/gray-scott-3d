@@ -4,9 +4,23 @@ import { CpuSimulationEngine } from "./cpuSimulationEngine.js";
 import { GpuSimulationEngine } from "./gpuSimulationEngine.js";
 import { getLocale, setupI18n, translate } from "./i18n.js";
 import { DEFAULT_STATE, PRESETS } from "./presets.js";
+import {
+  QUALITY_PROFILES,
+  chooseAutoQualityTier,
+  detectPreferredQualityTier,
+  resolveQualityTier
+} from "./qualityProfiles.js";
 import { VolumeRenderer } from "./volumeRenderer.js";
 
 const state = { ...DEFAULT_STATE };
+const preferredAutoQualityTier = detectPreferredQualityTier({
+  userAgent: navigator.userAgent,
+  platform: navigator.platform,
+  maxTouchPoints: navigator.maxTouchPoints,
+  coarsePointer: window.matchMedia("(pointer: coarse)").matches,
+  shortScreenEdge: Math.min(window.screen.width, window.screen.height),
+  mobileHint: navigator.userAgentData?.mobile ?? false
+});
 let activePreset = PRESETS[0]?.id ?? "";
 let running = false;
 let latestVolume = null;
@@ -17,6 +31,11 @@ let computeBackend = "gpgpu";
 let engine = null;
 let animationFrameId = 0;
 let renderFramesRemaining = 0;
+let qualityMode = "auto";
+let activeAutoQualityTier = preferredAutoQualityTier;
+let lastRenderTimestamp = 0;
+let averageFrameMs = 0;
+let qualityObservationStartedAt = 0;
 const controlUpdaters = new Map();
 const displayPrecision = {
   feed: 4,
@@ -48,6 +67,7 @@ const elements = {
   speed: document.querySelector("#speed"),
   speedNumber: document.querySelector("#speedNumber"),
   gridSize: document.querySelector("#gridSize"),
+  qualityMode: document.querySelector("#qualityMode"),
   dx: document.querySelector("#dx"),
   seed: document.querySelector("#seed"),
   boundary: document.querySelector("#boundary"),
@@ -176,6 +196,9 @@ function bindControls() {
     state.boundary = elements.boundary.value;
     resetSimulation();
   });
+  elements.qualityMode.addEventListener("change", () => {
+    setQualityMode(elements.qualityMode.value);
+  });
 
   elements.runPause.addEventListener("click", () => setRunning(!running));
   elements.reset.addEventListener("click", resetSimulation);
@@ -246,6 +269,8 @@ function resetSimulation() {
 
 function setRunning(nextRunning) {
   running = nextRunning;
+  resetFrameTiming();
+  applyQualityProfile();
   safeEngineCall(() => engine?.setRunning(running));
   requestRender(running ? 2 : 4);
   syncDynamicText();
@@ -271,6 +296,7 @@ function setComputeBackend(nextBackend) {
         : new CpuSimulationEngine(handleSimulationFrame);
     computeBackend = requestedBackend;
     elements.gpuBackend.disabled = false;
+    engine.setPerformanceProfile?.(getActiveQualityProfile());
     engine.reset({ ...state });
   } catch (error) {
     fallbackToCpu(error, shouldResume);
@@ -341,6 +367,68 @@ function setRenderMode(nextMode) {
   renderer?.setMode(renderMode);
   elements.volumeMode.setAttribute("aria-pressed", String(renderMode === "volume"));
   elements.surfaceMode.setAttribute("aria-pressed", String(renderMode === "surface"));
+}
+
+function setQualityMode(nextMode) {
+  qualityMode = nextMode === "high" || nextMode === "economy" ? nextMode : "auto";
+  activeAutoQualityTier = preferredAutoQualityTier;
+  elements.qualityMode.value = qualityMode;
+  resetFrameTiming();
+  applyQualityProfile();
+}
+
+function getActiveQualityProfile() {
+  const tier = resolveQualityTier(qualityMode, activeAutoQualityTier);
+  return QUALITY_PROFILES[tier];
+}
+
+function applyQualityProfile() {
+  const profile = getActiveQualityProfile();
+  renderer?.setQuality(profile);
+  engine?.setPerformanceProfile?.(profile);
+}
+
+function resetFrameTiming() {
+  lastRenderTimestamp = 0;
+  averageFrameMs = 0;
+  qualityObservationStartedAt = 0;
+}
+
+function observeAutoQuality(timestamp) {
+  if (!running || qualityMode !== "auto") {
+    lastRenderTimestamp = timestamp;
+    return;
+  }
+
+  if (!lastRenderTimestamp) {
+    lastRenderTimestamp = timestamp;
+    qualityObservationStartedAt = timestamp;
+    return;
+  }
+
+  const frameMs = timestamp - lastRenderTimestamp;
+  lastRenderTimestamp = timestamp;
+  if (frameMs < 5 || frameMs > 150) {
+    qualityObservationStartedAt = timestamp;
+    return;
+  }
+
+  averageFrameMs = averageFrameMs ? averageFrameMs * 0.92 + frameMs * 0.08 : frameMs;
+  const observationMs = timestamp - qualityObservationStartedAt;
+  const requiredObservationMs = averageFrameMs > 30 ? 1500 : 6000;
+  if (observationMs < requiredObservationMs) return;
+
+  const nextTier = chooseAutoQualityTier({
+    currentTier: activeAutoQualityTier,
+    preferredTier: preferredAutoQualityTier,
+    averageFrameMs
+  });
+  if (nextTier !== activeAutoQualityTier) {
+    activeAutoQualityTier = nextTier;
+    applyQualityProfile();
+  }
+  averageFrameMs = 0;
+  qualityObservationStartedAt = timestamp;
 }
 
 function updateMetrics(metrics) {
@@ -457,8 +545,9 @@ function requestRender(frames = 1) {
   }
 }
 
-function renderLoop() {
+function renderLoop(timestamp) {
   animationFrameId = 0;
+  observeAutoQuality(timestamp);
   const controlsChanged = renderer?.render() ?? false;
   if (renderFramesRemaining > 0) {
     renderFramesRemaining -= 1;
@@ -476,6 +565,7 @@ function renderLoop() {
 
 setupPresets();
 bindControls();
+applyQualityProfile();
 setComputeBackend(computeBackend);
 applyState(state, true);
 setRenderMode(renderMode);

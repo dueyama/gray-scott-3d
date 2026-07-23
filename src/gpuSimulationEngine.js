@@ -3,7 +3,9 @@ import * as THREE from "three";
 import { atlasPixelIndex, createAtlasLayout } from "./gpuAtlasLayout.js";
 import { createInitialFields } from "./initialConditions.js";
 
-const SNAPSHOT_INTERVAL_MS = 500;
+const DEFAULT_SNAPSHOT_INTERVAL_MS = 500;
+const DEFAULT_COMPUTE_BUDGET_MS = 12;
+const DEFAULT_MAX_STEPS_PER_CHUNK = 100;
 
 const vertexShader = /* glsl */ `
   in vec3 position;
@@ -166,6 +168,19 @@ export class GpuSimulationEngine {
     this.latestVolume = null;
     this.latestMetrics = null;
     this.lastSnapshotAt = 0;
+    this.snapshotIntervalMs = DEFAULT_SNAPSHOT_INTERVAL_MS;
+    this.computeBudgetMs = DEFAULT_COMPUTE_BUDGET_MS;
+    this.maxStepsPerChunk = DEFAULT_MAX_STEPS_PER_CHUNK;
+    this.adaptiveChunkSize = DEFAULT_MAX_STEPS_PER_CHUNK;
+    this.loopGeneration = 0;
+    this.continuations = new Map();
+    this.nextContinuationId = 1;
+    this.yieldChannel = new MessageChannel();
+    this.yieldChannel.port1.onmessage = (event) => {
+      const continuation = this.continuations.get(event.data);
+      this.continuations.delete(event.data);
+      continuation?.();
+    };
   }
 
   configure(config) {
@@ -180,7 +195,29 @@ export class GpuSimulationEngine {
     }
   }
 
+  setPerformanceProfile({
+    snapshotIntervalMs,
+    computeBudgetMs,
+    maxStepsPerChunk
+  } = {}) {
+    this.snapshotIntervalMs = Math.max(
+      250,
+      Number(snapshotIntervalMs) || DEFAULT_SNAPSHOT_INTERVAL_MS
+    );
+    this.computeBudgetMs = Math.max(
+      2,
+      Number(computeBudgetMs) || DEFAULT_COMPUTE_BUDGET_MS
+    );
+    this.maxStepsPerChunk = Math.max(
+      1,
+      Number(maxStepsPerChunk) | 0 || DEFAULT_MAX_STEPS_PER_CHUNK
+    );
+    this.adaptiveChunkSize = this.maxStepsPerChunk;
+  }
+
   reset(config = this.config) {
+    const shouldResume = this.running;
+    this.cancelScheduledWork();
     this.config = { ...this.config, ...config };
     const fields = createInitialFields(this.config);
     this.size = fields.size;
@@ -194,24 +231,39 @@ export class GpuSimulationEngine {
     this.latestMetrics = snapshot.metrics;
     this.lastSnapshotAt = performance.now();
     this.emitFrame(null, false, true);
+    if (shouldResume) {
+      this.loop(this.loopGeneration);
+    }
   }
 
   setRunning(running) {
+    const wasRunning = this.running;
     this.running = Boolean(running);
-    window.clearTimeout(this.timer);
+    this.cancelScheduledWork();
     if (this.running) {
-      this.loop();
+      this.loop(this.loopGeneration);
+    } else if (wasRunning && this.count) {
+      this.emitFrame(undefined, false);
     }
   }
 
   dispose() {
-    window.clearTimeout(this.timer);
+    this.running = false;
+    this.cancelScheduledWork();
+    this.yieldChannel.port1.close();
+    this.yieldChannel.port2.close();
     this.initialTexture?.dispose();
     for (const target of this.targets) {
       target.dispose();
     }
     this.geometry.dispose();
     this.material.dispose();
+  }
+
+  cancelScheduledWork() {
+    window.clearTimeout(this.timer);
+    this.loopGeneration += 1;
+    this.continuations.clear();
   }
 
   ensureCapacity() {
@@ -294,40 +346,109 @@ export class GpuSimulationEngine {
     this.nextTarget = 0;
   }
 
-  loop() {
-    if (!this.running) return;
+  loop(generation) {
+    if (!this.running || generation !== this.loopGeneration) return;
 
     try {
       const steps = Math.max(1, Number(this.config.speed) | 0);
-      const shouldSample = performance.now() - this.lastSnapshotAt >= SNAPSHOT_INTERVAL_MS;
+      const shouldSample =
+        performance.now() - this.lastSnapshotAt >= this.snapshotIntervalMs;
       if (shouldSample) {
         this.gl.finish();
       }
-      const startedAt = performance.now();
-      this.advance(steps);
-      if (shouldSample) {
-        this.gl.finish();
-      }
-      const computeMs = performance.now() - startedAt;
-      this.stepCount += steps;
+      this.processBatchChunk({
+        generation,
+        remainingSteps: steps,
+        completedSteps: 0,
+        computeMs: 0,
+        shouldSample,
+        startedAt: performance.now()
+      });
+    } catch (error) {
+      this.handleLoopError(error);
+    }
+  }
 
-      const performanceInfo = shouldSample
+  processBatchChunk(batch) {
+    if (!this.running || batch.generation !== this.loopGeneration) return;
+
+    try {
+      const chunkSteps = Math.min(
+        batch.remainingSteps,
+        this.adaptiveChunkSize,
+        this.maxStepsPerChunk
+      );
+      const startedAt = performance.now();
+      this.advance(chunkSteps);
+      const chunkMs = performance.now() - startedAt;
+      batch.computeMs += chunkMs;
+      batch.completedSteps += chunkSteps;
+      batch.remainingSteps -= chunkSteps;
+      this.stepCount += chunkSteps;
+      this.adjustChunkSize(chunkSteps, chunkMs);
+
+      if (batch.remainingSteps > 0) {
+        this.queueContinuation(() => this.processBatchChunk(batch));
+        return;
+      }
+
+      if (batch.shouldSample) {
+        const waitStartedAt = performance.now();
+        this.gl.finish();
+        batch.computeMs += performance.now() - waitStartedAt;
+      }
+
+      const performanceInfo = batch.shouldSample
         ? {
-            steps,
-            computeMs,
+            steps: batch.completedSteps,
+            computeMs: batch.computeMs,
             readbackMs: 0,
-            totalMs: computeMs,
+            totalMs: batch.computeMs,
             cellsPerSecond: null
           }
         : undefined;
-      this.emitFrame(performanceInfo, shouldSample);
-      const totalMs = performance.now() - startedAt;
-      const delay = Math.max(0, 16 - totalMs);
-      this.timer = window.setTimeout(() => this.loop(), delay);
+      this.emitFrame(performanceInfo, batch.shouldSample);
+      const batchMs = performance.now() - batch.startedAt;
+      const delay = Math.max(0, 16 - batchMs);
+      this.timer = window.setTimeout(
+        () => this.loop(batch.generation),
+        delay
+      );
     } catch (error) {
-      this.running = false;
-      this.onError?.(error);
+      this.handleLoopError(error);
     }
+  }
+
+  queueContinuation(callback) {
+    const continuationId = this.nextContinuationId;
+    this.nextContinuationId += 1;
+    this.continuations.set(continuationId, callback);
+    this.yieldChannel.port2.postMessage(continuationId);
+  }
+
+  adjustChunkSize(chunkSteps, chunkMs) {
+    if (chunkMs > this.computeBudgetMs * 1.2 && chunkSteps > 1) {
+      this.adaptiveChunkSize = Math.max(
+        1,
+        Math.floor(chunkSteps * (this.computeBudgetMs / chunkMs) * 0.85)
+      );
+      return;
+    }
+    if (
+      chunkMs < this.computeBudgetMs * 0.45 &&
+      this.adaptiveChunkSize < this.maxStepsPerChunk
+    ) {
+      this.adaptiveChunkSize = Math.min(
+        this.maxStepsPerChunk,
+        Math.max(this.adaptiveChunkSize + 1, Math.ceil(this.adaptiveChunkSize * 1.35))
+      );
+    }
+  }
+
+  handleLoopError(error) {
+    this.running = false;
+    this.cancelScheduledWork();
+    this.onError?.(error);
   }
 
   advance(steps) {

@@ -279,6 +279,14 @@ export class VolumeRenderer {
     return this.renderer;
   }
 
+  setQuality({ pixelRatioCap, raySteps }) {
+    const ratioCap = Math.max(0.75, Number(pixelRatioCap) || 1);
+    const steps = Math.max(48, Math.min(192, Number(raySteps) | 0));
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, ratioCap));
+    this.material.uniforms.steps.value = steps;
+    this.resize();
+  }
+
   setThreshold(value) {
     this.material.uniforms.threshold.value = value;
     this.surfaceMesh.isolation = this.thresholdToIsolation(value);

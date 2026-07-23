@@ -19,6 +19,8 @@ The goal is public exploration rather than research-grade numerical analysis. Th
 - Optional Marching Cubes isosurface view
 - Switchable CPU Worker and WebGL2 GPGPU simulation backends with live timing metrics
 - GPGPU is used by default when available, with automatic fallback to CPU mode
+- Automatic render-quality profiles for phones, tablets, and desktop devices
+- Manual `Auto`, `High quality`, and `Power saving` render modes
 - Adjustable `F`, `k`, display threshold, simulation speed, and boundary condition
 - Neumann and periodic boundary modes
 - Reproducible initial conditions using a seeded Mersenne Twister
@@ -57,6 +59,8 @@ The main view is GPU volume raymarching with Three.js and WebGL2.
 The UI reports sampled compute time, transfer/conversion time, and approximate cell-update throughput for comparing CPU and GPGPU behavior on the current browser and GPU. Marching Cubes remains CPU-bound, while the main GPGPU volume path stays on the GPU between periodic supporting-view snapshots.
 
 Central XY, XZ, and YZ slice views are also shown as compact supporting views.
+
+`Auto` quality starts phones with a lower pixel ratio and fewer raymarching samples, then observes actual frame timing and reduces quality further only when needed. GPGPU step batches are split into short chunks on mobile-class profiles so controls and camera movement can remain responsive without changing the numerical parameters or step sequence.
 
 ## Local Development
 
