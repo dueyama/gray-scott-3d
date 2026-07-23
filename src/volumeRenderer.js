@@ -18,8 +18,14 @@ const vertexShader = /* glsl */ `
 const fragmentShader = /* glsl */ `
   precision highp float;
   precision highp sampler3D;
+  precision highp sampler2D;
 
   uniform sampler3D volumeMap;
+  uniform sampler2D stateAtlas;
+  uniform int volumeSource;
+  uniform int stateSize;
+  uniform int atlasColumns;
+  uniform vec2 atlasDimensions;
   uniform float threshold;
   uniform float opacity;
   uniform int steps;
@@ -29,6 +35,31 @@ const fragmentShader = /* glsl */ `
 
   in vec3 vPosition;
   out vec4 outColor;
+
+  float sampleAtlasLayer(int layer, vec2 localPosition) {
+    int tileColumn = layer % atlasColumns;
+    int tileRow = layer / atlasColumns;
+    vec2 pixelPosition =
+      vec2(float(tileColumn * stateSize), float(tileRow * stateSize)) +
+      localPosition +
+      vec2(0.5);
+    return texture(stateAtlas, pixelPosition / atlasDimensions).g;
+  }
+
+  float sampleVolume(vec3 texCoord) {
+    if (volumeSource == 0) {
+      return texture(volumeMap, texCoord).r;
+    }
+
+    vec3 gridPosition =
+      clamp(texCoord, vec3(0.0), vec3(1.0)) * float(stateSize - 1);
+    int layer0 = int(floor(gridPosition.z));
+    int layer1 = min(layer0 + 1, stateSize - 1);
+    float layerMix = fract(gridPosition.z);
+    float value0 = sampleAtlasLayer(layer0, gridPosition.xy);
+    float value1 = sampleAtlasLayer(layer1, gridPosition.xy);
+    return mix(value0, value1, layerMix);
+  }
 
   vec2 hitBox(vec3 orig, vec3 dir) {
     const vec3 boxMin = vec3(-0.5);
@@ -64,7 +95,7 @@ const fragmentShader = /* glsl */ `
         break;
       }
       vec3 texCoord = p + vec3(0.5);
-      float value = texture(volumeMap, texCoord).r;
+      float value = sampleVolume(texCoord);
       float halo = smoothstep(threshold * 0.18, threshold, value) * 0.24;
       float core = smoothstep(threshold, threshold + 0.07, value);
       float density = clamp(halo + core, 0.0, 1.0);
@@ -120,6 +151,11 @@ export class VolumeRenderer {
       glslVersion: THREE.GLSL3,
       uniforms: {
         volumeMap: { value: this.texture },
+        stateAtlas: { value: null },
+        volumeSource: { value: 0 },
+        stateSize: { value: 64 },
+        atlasColumns: { value: 8 },
+        atlasDimensions: { value: new THREE.Vector2(512, 512) },
         threshold: { value: 0.025 },
         opacity: { value: 0.26 },
         steps: { value: 144 },
@@ -204,6 +240,7 @@ export class VolumeRenderer {
   updateVolume(data, size) {
     this.latestVolume = data;
     this.latestSize = size;
+    this.material.uniforms.volumeSource.value = 0;
 
     if (this.texture.image.width !== size) {
       this.texture.dispose();
@@ -218,6 +255,28 @@ export class VolumeRenderer {
       this.updateSurface(false);
     }
     this.invalidate(2);
+  }
+
+  updateGpuVolume(texture, size, layout) {
+    this.latestSize = size;
+    this.material.uniforms.stateAtlas.value = texture;
+    this.material.uniforms.volumeSource.value = 1;
+    this.material.uniforms.stateSize.value = size;
+    this.material.uniforms.atlasColumns.value = layout.columns;
+    this.material.uniforms.atlasDimensions.value.set(layout.width, layout.height);
+    this.invalidate(1);
+  }
+
+  updateSnapshot(data, size) {
+    this.latestVolume = data;
+    this.latestSize = size;
+    if (this.mode === "surface") {
+      this.updateSurface(false);
+    }
+  }
+
+  getWebGLRenderer() {
+    return this.renderer;
   }
 
   setThreshold(value) {

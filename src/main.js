@@ -263,7 +263,11 @@ function setComputeBackend(nextBackend) {
   try {
     engine =
       requestedBackend === "gpgpu"
-        ? new GpuSimulationEngine(handleSimulationFrame, (error) => fallbackToCpu(error, running))
+        ? new GpuSimulationEngine(
+            handleSimulationFrame,
+            (error) => fallbackToCpu(error, running),
+            renderer?.getWebGLRenderer()
+          )
         : new CpuSimulationEngine(handleSimulationFrame);
     computeBackend = requestedBackend;
     elements.gpuBackend.disabled = false;
@@ -310,11 +314,24 @@ function fallbackToCpu(error, shouldResume) {
 function handleSimulationFrame(frame) {
   latestSize = frame.size;
   latestStep = frame.step;
-  latestVolume = frame.volume;
-  renderer?.updateVolume(latestVolume, latestSize);
-  drawSlices(latestVolume, latestSize);
-  updateMetrics(frame.metrics);
-  updatePerformance(frame.performance);
+  if (frame.gpuState) {
+    renderer?.updateGpuVolume(frame.gpuState.texture, latestSize, frame.gpuState.layout);
+  }
+  if (frame.volume) {
+    latestVolume = frame.volume;
+    if (frame.gpuState) {
+      renderer?.updateSnapshot(latestVolume, latestSize);
+    } else {
+      renderer?.updateVolume(latestVolume, latestSize);
+    }
+    drawSlices(latestVolume, latestSize);
+  }
+  if (frame.metrics) {
+    updateMetrics(frame.metrics);
+  }
+  if (frame.performance !== undefined) {
+    updatePerformance(frame.performance);
+  }
   updateStepCounter();
   requestRender(running ? 2 : 1);
 }
