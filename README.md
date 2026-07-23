@@ -48,13 +48,13 @@ The main view is GPU volume raymarching with Three.js and WebGL2.
 
 1. The selected simulation backend updates the 3D `U` and `V` fields.
 2. CPU mode runs the explicit stencil update in a Web Worker.
-3. GPGPU mode packs `U,V` into WebGL2 `RGBA32F` textures and advances them with a fragment shader and ping-pong framebuffers.
-4. The `V` field is quantized/read back to `Uint8Array`.
-5. The main thread uploads it as a `THREE.Data3DTexture`.
+3. GPGPU mode packs `U,V` into compact tiled WebGL2 `RGBA32F` textures and advances them with a fragment shader and ping-pong framebuffers.
+4. In GPGPU volume mode, the raymarching shader samples the current simulation texture directly, without per-frame GPU-to-CPU readback or `Data3DTexture` re-upload.
+5. CPU mode uploads the quantized `V` field as a `THREE.Data3DTexture`.
 6. A fragment shader accumulates color and opacity above the visible threshold.
-7. The isosurface mode uses the Three.js `MarchingCubes` addon to generate a mesh from the same `V` field.
+7. Periodic CPU snapshots support the slice views, live metrics, and the Three.js `MarchingCubes` isosurface mode.
 
-The GPGPU backend still reads back the displayed field each frame so the app can reuse the same volume renderer, slice views, and isosurface path. The UI reports compute time, transfer/conversion time, and approximate cell-update throughput for comparing CPU and GPGPU behavior on the current browser and GPU.
+The UI reports sampled compute time, transfer/conversion time, and approximate cell-update throughput for comparing CPU and GPGPU behavior on the current browser and GPU. Marching Cubes remains CPU-bound, while the main GPGPU volume path stays on the GPU between periodic supporting-view snapshots.
 
 Central XY, XZ, and YZ slice views are also shown as compact supporting views.
 
@@ -85,6 +85,10 @@ This is a static Vite app. Import the repository into Vercel with the default Vi
 - Install Command: `npm install`
 
 The app has two static entry pages, `/` and `/about.html`; no custom rewrite configuration is required.
+
+## Changelog
+
+See [CHANGELOG.md](./CHANGELOG.md) for notable updates.
 
 ## Repository Structure
 

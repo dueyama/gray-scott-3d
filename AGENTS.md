@@ -9,7 +9,7 @@ The public web app lives in `src/`. A local copy of the legacy C implementation 
 ## Runtime
 
 - App framework: Vite
-- Rendering: Three.js, WebGL2, `THREE.Data3DTexture`
+- Rendering: Three.js and WebGL2; CPU mode uses `THREE.Data3DTexture`, while GPGPU volume mode samples the simulation atlas directly
 - Simulation: explicit finite-difference Euler update, selectable between a CPU Web Worker backend and a WebGL2 GPGPU backend. GPGPU is the default when available; CPU is the fallback.
 - Randomness: deterministic Mersenne Twister with a user-visible seed
 - Deployment target: GitHub public repository, then Vercel static deployment
@@ -68,14 +68,15 @@ The primary visualization should remain volume raymarching, not a CPU-generated 
 Current pipeline:
 
 1. CPU mode computes `U` and `V` as `Float32Array` in `simWorker.js`.
-2. GPGPU mode packs `U,V` into WebGL2 `RGBA32F` textures and advances them with a fragment-shader stencil update using ping-pong framebuffers.
-3. Both modes quantize/read back `V` to `Uint8Array` for the existing visualization path.
-4. Main thread uploads `V` into a Three.js `Data3DTexture`.
-5. Fragment shader raymarches through a cube and accumulates color/opacity above a visible threshold.
-6. Optional isosurface mode uses Three.js `MarchingCubes` on the quantized `V` field with `isolation = threshold * 0.5 * 255`, because the mesh needs a lower cutoff than the volume shader's perceptual threshold.
-7. 2D slice canvases show central XY/XZ/YZ cuts as a fallback explanation aid.
+2. GPGPU mode packs `U,V` into compact tiled WebGL2 `RGBA32F` textures and advances them with a fragment-shader stencil update using ping-pong framebuffers.
+3. CPU mode quantizes `V` to `Uint8Array` and uploads it into a Three.js `Data3DTexture`.
+4. GPGPU volume mode passes the current simulation texture directly to the raymarching shader; do not add per-frame readback or re-upload to this path.
+5. GPGPU mode takes periodic CPU snapshots for metrics, slice canvases, and Marching Cubes.
+6. The fragment shader raymarches through a cube and accumulates color/opacity above a visible threshold.
+7. Optional isosurface mode uses Three.js `MarchingCubes` on the quantized `V` field with `isolation = threshold * 0.5 * 255`, because the mesh needs a lower cutoff than the volume shader's perceptual threshold.
+8. 2D slice canvases show central XY/XZ/YZ cuts as a fallback explanation aid.
 
-The GPGPU backend is intended for interactive speed comparisons, but it still reads the field back to the CPU each displayed frame so it can reuse the existing `Data3DTexture`, slice, and Marching Cubes pipeline. Do not claim it is a fully GPU-resident renderer unless that architecture changes.
+The main GPGPU volume path is GPU-resident between periodic supporting-view snapshots. Marching Cubes and the 2D slice canvases still depend on CPU snapshots, so do not claim the entire app is fully GPU-resident.
 
 Keep Marching Cubes as a separate optional view. It is CPU-bound, so do not update it more often than necessary during continuous simulation.
 

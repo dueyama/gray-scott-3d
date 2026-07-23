@@ -128,9 +128,9 @@ const translations = {
     "about.compute.p2":
       "CPU mode updates the U and V <code>Float32Array</code> fields in a Web Worker. Running the numerical loop outside the main browser thread helps keep the interface responsive.",
     "about.compute.p3":
-      "GPGPU mode also uses WebGL2 for the numerical update. U and V are packed into an <code>RGBA32F</code> 2D texture, a fragment shader performs one Gray-Scott step, and two textures are alternated as ping-pong framebuffers for repeated updates.",
+      "GPGPU mode also uses WebGL2 for the numerical update. U and V are packed into a compact tiled <code>RGBA32F</code> 2D texture, a fragment shader performs one Gray-Scott step, and two textures are alternated as ping-pong framebuffers for repeated updates.",
     "about.compute.p4":
-      "The current implementation still reads the displayed V field back from the GPU each frame so it can reuse the existing Three.js <code>Data3DTexture</code> renderer, slice views, and Marching Cubes surface mode. It is therefore not a fully GPU-resident pipeline. The frame time, readback, and throughput values in the app are live measurements for comparing CPU and GPGPU behavior on the current browser and GPU.",
+      "In volume mode, the Three.js raymarching shader samples the current GPGPU texture directly, so the main view no longer reads the field back to the CPU and uploads it again on every frame. Periodic CPU snapshots are still used for metrics, the three slice views, and the CPU-based Marching Cubes surface. The displayed timing values are sampled measurements that include this occasional transfer.",
     "about.compute.p5":
       "This Gray-Scott update is especially favorable for GPGPU execution. Each grid point can be advanced almost independently, using only its own value and the six nearest neighbors. Because this browser version uses an explicit update rather than a global linear solver such as ICCG, the same small calculation can be applied to many grid points in parallel. In the current presets, the U and V diffusion coefficients are on the same order of magnitude, and the reaction terms do not contain extremely large rate constants. That also allows a relatively large explicit time step, which helps the simulation move well in the browser.",
     "about.ref.mrob.note":
@@ -262,9 +262,9 @@ const translations = {
     "about.compute.p2":
       "CPU モードでは Web Worker 上で <code>Float32Array</code> の U、V 配列を更新します。画面本体とは別スレッドで計算するため、ブラウザの操作を止めにくくしています。",
     "about.compute.p3":
-      "GPGPU モードでは WebGL2 を計算にも使います。U と V を <code>RGBA32F</code> の2次元テクスチャに詰め、fragment shader で1ステップ分の Gray-Scott 更新を行い、2枚のテクスチャを ping-pong しながら交互に読み書きします。",
+      "GPGPU モードでは WebGL2 を計算にも使います。U と V をタイル状に並べたコンパクトな <code>RGBA32F</code> の2次元テクスチャに詰め、fragment shader で1ステップ分の Gray-Scott 更新を行い、2枚のテクスチャを ping-pong しながら交互に読み書きします。",
     "about.compute.p4":
-      "ただし現在の実装は、表示するたびに V の濃度場を GPU から読み戻し、既存の Three.js の <code>Data3DTexture</code>、断面図、Marching Cubes 表示へ渡しています。そのため完全に GPU 上だけで完結する構成ではありません。処理時間、転送/変換、更新速度は、この読み戻しも含めた実測値として CPU と GPGPU を比較するための目安です。",
+      "Volume 表示では、Three.js のレイマーチング用シェーダーが現在の GPGPU テクスチャを直接読むため、表示のたびに濃度場を CPU へ戻して GPU へ送り直す処理はありません。ただし、統計値、3方向の断面図、CPU で作る Marching Cubes の等値面には、低頻度の CPU スナップショットを使います。画面の処理時間と転送時間は、この時々行う転送を含むサンプル計測値です。",
     "about.compute.p5":
       "この Gray-Scott 計算では特に GPGPU の効果が出やすくなります。更新は各格子点でほぼ独立しており、必要なのは自分自身と隣接6点の値だけです。さらに今回は ICCG のような大域的な線形方程式ソルバを使わず、同じ陽的な更新式を多数の格子点に繰り返し適用するため、GPU の並列計算と相性がよくなります。現在のプリセットでは U と V の拡散係数が同じ桁で、反応項にも極端に大きな速度定数が入っていないため、陽解法でも比較的大きな時間刻みを取れることも、ブラウザ上で動かしやすい理由です。",
     "about.ref.mrob.note":
